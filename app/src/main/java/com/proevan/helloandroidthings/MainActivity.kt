@@ -5,6 +5,11 @@ import android.os.Bundle
 import com.google.android.things.pio.Gpio
 import com.google.android.things.pio.GpioCallback
 import com.google.android.things.pio.PeripheralManagerService
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
+
 
 class MainActivity : Activity() {
 
@@ -36,6 +41,7 @@ class MainActivity : Activity() {
         redLeoGpio = pmService.openGpio(GPIO_RED_LED).apply {
             setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW)
         }
+        bindRedLedStateWithCloud()
     }
 
     private fun initGreenLed() {
@@ -53,12 +59,37 @@ class MainActivity : Activity() {
                     greenLedGpio.value = gpio.value
                     if (gpio.value == false) {
                         redLedState = !redLedState
+                        updateRedLedStateToCloud(redLedState)
                         redLeoGpio.value = redLedState
                     }
                     return true
                 }
             })
         }
+    }
+
+    private fun bindRedLedStateWithCloud() {
+        val db = FirebaseDatabase.getInstance()
+        val redLedDbRef = db.getReference("redLed")
+        redLedDbRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(dataSnapshot: DataSnapshot) {
+                val value = dataSnapshot.getValue(Boolean::class.java)
+                if (value != null && value != redLedState) {
+                    redLedState = value
+                    redLeoGpio.value = redLedState
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                // Failed to read value
+            }
+        })
+    }
+
+    private fun updateRedLedStateToCloud(state: Boolean) {
+        val db = FirebaseDatabase.getInstance()
+        val redLedDbRef = db.getReference("redLed")
+        redLedDbRef.setValue(state)
     }
 
 }
